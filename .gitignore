@@ -1,0 +1,10 @@
+# node / angular
+node_modules/
+dist/
+# java
+target/
+# docker
+*.log
+# IDE
+.idea/
+.vscode/
