@@ -1,0 +1,65 @@
+networks:
+  app-net: {}
+
+volumes:
+  mysql_data:
+
+services:
+  mysql:
+    build:
+      context: ../db/mysql
+    image: orlando/mysql:${IMAGE_TAG:-1.0.0}
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: ${MYSQL_DB:-appdb}
+      MYSQL_USER: ${MYSQL_USER:-app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-secret}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ../db/mysql/init:/docker-entrypoint-initdb.d
+    networks:
+      - app-net
+
+  api:
+    build:
+      context: ../app/api
+    image: orlando/api:${IMAGE_TAG:-1.0.0}
+    environment:
+      SERVER_PORT: ${SERVER_PORT:-8081}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DB:-appdb}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-app}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-secret}
+    depends_on:
+      - mysql
+    networks:
+      - app-net
+
+  frontend:
+    build:
+      context: ../app/frontend
+    image: orlando/frontend:${IMAGE_TAG:-1.0.0}
+    networks:
+      - app-net
+
+  prometheus:
+    build:
+      context: ../monitoring/prometheus
+    image: orlando/prometheus:${IMAGE_TAG:-1.0.0}
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    depends_on:
+      - api
+    networks:
+      - app-net
+
+  gateway:
+    build:
+      context: ../app/gateway/traefik
+    image: orlando/gateway:${IMAGE_TAG:-1.0.0}
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    depends_on:
+      - frontend
+      - api
+    networks:
+      - app-net

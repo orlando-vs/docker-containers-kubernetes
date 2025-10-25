@@ -1,0 +1,19 @@
+http:
+  routers:
+    api_router:
+      rule: "PathPrefix(`/api`)"
+      entryPoints: [web]
+      service: api_svc
+    frontend_router:
+      rule: "PathPrefix(`/`)"
+      entryPoints: [web]
+      service: frontend_svc
+  services:
+    api_svc:
+      loadBalancer:
+        servers:
+          - url: "http://api:8081"
+    frontend_svc:
+      loadBalancer:
+        servers:
+          - url: "http://frontend:80"
