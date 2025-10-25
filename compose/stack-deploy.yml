@@ -1,0 +1,126 @@
+networks:
+  app-net:
+    driver: overlay
+
+volumes:
+  mysql_data:
+  prometheus_data:
+
+configs:
+  prometheus_yml:
+    file: ../monitoring/prometheus/prometheus.yml
+  traefik_yml:
+    file: ../app/gateway/traefik/traefik.yml
+  traefik_dynamic_yml:
+    file: ../app/gateway/traefik/dynamic.yml
+
+secrets:
+  mysql_root:
+    external: true
+  mysql_app:
+    external: true
+
+services:
+  mysql:
+    image: orlando/mysql:${IMAGE_TAG:-1.0.0}
+    environment:
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root
+      MYSQL_DATABASE: ${MYSQL_DB:-appdb}
+      MYSQL_USER: ${MYSQL_USER:-app}
+      MYSQL_PASSWORD_FILE: /run/secrets/mysql_app
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ../db/mysql/init:/docker-entrypoint-initdb.d
+    secrets:
+      - source: mysql_root
+        target: mysql_root
+      - source: mysql_app
+        target: mysql_app
+    networks: [app-net]
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+      restart_policy:
+        condition: on-failure
+
+  api:
+    image: orlando/api:${IMAGE_TAG:-1.0.0}
+    environment:
+      SERVER_PORT: ${SERVER_PORT:-8081}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DB:-appdb}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-app}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-secret}
+    networks: [app-net]
+    deploy:
+      replicas: 2
+      update_config:
+        order: start-first
+        parallelism: 1
+        delay: 5s
+      rollback_config:
+        order: start-first
+        parallelism: 1
+        delay: 5s
+      restart_policy:
+        condition: on-failure
+
+  frontend:
+    image: orlando/frontend:${IMAGE_TAG:-1.0.0}
+    networks: [app-net]
+    deploy:
+      replicas: 2
+      update_config:
+        order: start-first
+        parallelism: 2
+        delay: 3s
+      rollback_config:
+        order: start-first
+        parallelism: 2
+        delay: 3s
+      restart_policy:
+        condition: on-failure
+
+  prometheus:
+    image: orlando/prometheus:${IMAGE_TAG:-1.0.0}
+    ports:
+      - target: 9090
+        published: ${PROMETHEUS_PORT:-9090}
+        protocol: tcp
+        mode: host
+    configs:
+      - source: prometheus_yml
+        target: /etc/prometheus/prometheus.yml
+    volumes:
+      - prometheus_data:/prometheus
+    networks: [app-net]
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  gateway:
+    image: orlando/gateway:${IMAGE_TAG:-1.0.0}
+    ports:
+      - target: 8080
+        published: ${GATEWAY_PORT:-8080}
+        protocol: tcp
+        mode: host
+    configs:
+      - source: traefik_yml
+        target: /etc/traefik/traefik.yml
+      - source: traefik_dynamic_yml
+        target: /etc/traefik/dynamic/dynamic.yml
+    networks: [app-net]
+    deploy:
+      replicas: 2
+      update_config:
+        order: start-first
+        parallelism: 1
+        delay: 5s
+      rollback_config:
+        order: start-first
+        parallelism: 1
+        delay: 5s
+      restart_policy:
+        condition: on-failure
