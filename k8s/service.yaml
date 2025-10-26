@@ -1,0 +1,74 @@
+# ============================
+# MySQL Service
+# ============================
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: demo
+spec:
+  selector:
+    app: mysql
+  ports:
+    - port: 3306
+      targetPort: 3306
+---
+# ============================
+# API Service
+# ============================
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: demo
+spec:
+  selector:
+    app: api   # incluye pods v1 (ReplicaSet) y v2 (Deployment)
+  ports:
+    - port: 8081
+      targetPort: 8081
+
+# ============================
+# Frontend Service 
+# ============================
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: demo
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 80
+
+# ============================
+# Gateway Service
+# ============================
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: demo
+spec:
+  selector:
+    app: gateway
+  ports:
+    - port: 8080
+      targetPort: 8080
+
+# ============================
+# Prometheus Service 
+# ============================
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: demo
+spec:
+  selector:
+    app: prometheus
+  ports:
+    - port: 9090
+      targetPort: 9090
